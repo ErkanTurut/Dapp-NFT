@@ -11,4 +11,15 @@ module.exports = {
       network_id: "*",
     },
   },
+
+  // Configure your compilers
+  compilers: {
+    solc: {
+      version: "0.8.9",
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  },
 };
