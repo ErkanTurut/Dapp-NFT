@@ -1,8 +1,8 @@
 import React, { Component } from "react";
 import nft from "./contracts/NFT.json";
 import getWeb3 from "./getWeb3";
-
 import "./App.css";
+import ipfs from "./ipfs";
 
 window.ethereum.on("accountsChanged", async () => {
   window.location.reload(false);
@@ -15,6 +15,8 @@ class App extends Component {
     accounts: null,
     contract: null,
     balance: 0,
+    totalSupply: 0,
+    userCollections: [],
   };
   mintNFT = this.mintNFT.bind(this);
 
@@ -34,7 +36,23 @@ class App extends Component {
         deployedNetwork && deployedNetwork.address
       );
       console.log(instance);
+
+      //get user nft collection
+      const collection_balance = await instance.methods
+        .balanceOf(accounts[0])
+        .call();
+
       let balance = await web3.eth.getBalance(accounts[0]);
+
+      for (var i = 1; i <= collection_balance; i++) {
+        const collection = await instance.methods
+          .tokenOfOwnerByIndex(accounts[0], i - 1)
+          .call();
+        this.setState({
+          userCollections: [...this.state.userCollections, collection],
+        });
+      }
+
       // Set web3, accounts, and contract to the state, and then proceed with an
       // example of interacting with the contract's methods.
       this.setState(
@@ -49,19 +67,35 @@ class App extends Component {
       console.error(error);
     }
   };
-
   runExample = async () => {
-    const { web3, accounts, contract } = this.state;
-    const totalSupply = await contract.methods.totalSupply().call();
-    console.log(totalSupply);
-    const uri = await contract.methods.balanceOf(accounts[0]).call();
-    console.log(uri);
-    const owner = await contract.methods.ownerOf(totalSupply).call();
+    const { web3, accounts, contract, userCollections } = this.state;
+    console.log(userCollections.length);
+
+    for (var i = 0; i < userCollections.length; i++) {
+      const collection = await contract.methods
+        .tokenURI(userCollections[i])
+        .call();
+      //await getData(hash);
+      const link = await collection.replace("ipfs://", "");
+      console.log(link);
+      const { cid } = await ipfs.dag.resolve(link);
+      console.log(cid._baseCache.get("z"));
+      const t = await ipfs.cat(cid._baseCache.get("z"));
+      console.log(t);
+
+      for await (const itr of t) {
+        let data = Buffer.from(itr).toString();
+        console.log(data);
+        return data;
+      }
+
+      //const ipfs_file = ipfs.get(cid._baseCache.cat("z"));
+
+      //console.log(ipfs_file);
+    }
+
+    const owner = await contract.methods.ownerOf(8).call();
     console.log(owner);
-    const Approved = await contract.methods
-      .approve(owner, 3)
-      .send({ from: "0xC3bB87EDCBF01cEE0b3931924d1CaD523466709E" });
-    console.log(Approved);
   };
 
   async mintNFT() {
@@ -80,7 +114,7 @@ class App extends Component {
     return (
       <div className="App">
         <h1>Good to Go!</h1>
-        <p>Your Truffle Box is installed and ready.</p>
+        <p>Account : {this.state.accounts} </p>
         <h2>Smart Contract Example</h2>
         <p>
           {this.state.web3.utils.fromWei(this.state.balance.toString())} ether
